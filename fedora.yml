@@ -1,0 +1,249 @@
+# This is an Ansible playbook.
+# Run it with: ansible-playbook -K <THIS-FILE>
+- hosts: localhost
+  become: true
+  vars:
+    home: "{{ lookup('env', 'HOME') }}"
+  tasks:
+    - name: Upgrade all packages
+      dnf:
+        name: "*"
+        state: latest
+    - name: Setup hostname
+      block:
+        - hostname:
+            name: zal
+        - shell: echo zal >/etc/hostname
+    - name: Install basic tooling
+      package:
+        state: present
+        name:
+          - asciinema
+          - chrome-gnome-shell
+          - colordiff
+          - dnf-plugins-core
+          - fzf
+          - gnome-tweaks
+          - gparted
+          - htop
+          - jq
+          - most
+          - ripgrep
+          - tmux
+          - tokei
+          - units
+          - xclip
+          - yamllint
+          - levien-inconsolata-fonts
+    - name: Restore Duplicity backup
+      block:
+        - package:
+            state: present
+            name: duplicity
+    - name: Install Fish
+      package:
+        state: present
+        name: fish
+    - name: Install Vim
+      package:
+        state: present
+        name:
+          - vim
+          - ShellCheck
+    - name: Python
+      block:
+        - name: Install Python
+          package:
+            state: present
+            name:
+              - python3
+              - autoconf
+              - bzip2
+              - bzip2-devel
+              - libffi-devel
+              - libtool
+              - lldb
+              - python-lldb
+              - python3-devel
+              - python3-pip
+              - readline
+              - readline-devel
+              - sqlite-devel
+              - zlib-devel
+        - name: Install Pyenv
+          git:
+            repo: https://github.com/pyenv/pyenv.git
+            dest: "{{home}}/.pyenv"
+        - name: Install Pipenv
+          pip:
+            name: pipenv
+            extra_args: --user
+        - name: Poetry
+          vars:
+            installer: /tmp/get-poetry.py
+          block:
+            - name: Download the Poetry installer
+              when: installer is not exists
+              get_url:
+                url: https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py
+                dest: "{{installer}}"
+            - name: Run the Poetry installer
+              command: "python3 {{installer}}"
+        - name: Install IPython
+          pip:
+            name: ipython
+            virtualenv: "{{home}}/.virtualenvs/ipython"
+            virtualenv_site_packages: yes
+    - name: Install Java
+      package:
+        state: present
+        name:
+          - java-openjdk
+          - java-openjdk-devel
+          - java-openjdk-src
+          - java-openjdk-javadoc
+    - name: VSCode
+      block:
+        - name: Install the VSCode repository
+          yum_repository:
+            name: vscode
+            description: Visual Studio Code
+            baseurl: https://packages.microsoft.com/yumrepos/vscode
+            enabled: yes
+            gpgcheck: yes
+            gpgkey: https://packages.microsoft.com/keys/microsoft.asc
+        - name: Install VSCode
+          package:
+            state: present
+            name: code
+    - name: Docker
+      block:
+        - name: Ask whether Docker is already installed
+          command: which docker
+          register: which_docker
+        - when: which_docker.rc != 0
+          block:
+            - name: Download & install Docker
+              shell: curl -fsSL get.docker.com | CHANNEL=test sh
+            - name: Add me in the docker group
+              user:
+                name: "{{ lookup('env', 'USER') }}"
+                groups: [docker]
+                append: yes
+            - name: Enable & start Docker with systemd
+              systemd:
+                name: docker
+                state: started
+                enabled: yes
+    - name: Jetbrains IDEs
+      block:
+        - name: Increase inotify watch limit
+          sysctl:
+            name: fs.inotify.max_user_watches
+            value: 524288
+            sysctl_file: /etc/sysctl.d/jetbrains.conf
+            reload: yes
+        - vars:
+            tb_exe: "{{home}}/.local/share/JetBrains/Toolbox/bin/jetbrains-toolbox"
+            archive_path: /tmp/jetbrains_toolbox.tar.gz
+            extracted_path: /tmp/jetbrains_toolbox
+          when: tb_exe is not exists
+          block:
+            - name: Download Jetbrains Toolbox
+              vars:
+                tb_json: "{{ lookup('url', 'https://data.services.jetbrains.com/products/releases?code=TBA&latest=true&type=release') | from_json }}"
+                tb_url: "{{ tb_json | json_query('TBA[0].downloads.linux.link') }}"
+                tb_checksum_url: "{{ tb_json | json_query('TBA[0].downloads.linux.checksumLink') }}"
+              get_url:
+                url: "{{ tb_url }}"
+                checksum: "sha256:{{ tb_checksum_url }}"
+                dest: "{{ archive_path }}"
+            - name: Install Jetbrains Toolbox
+              unarchive:
+                remote_src: yes
+                src: "{{ archive_path }}"
+                dest: "{{ extracted_path }}"
+            - name: Locate the Jetbrains Toolbox executable
+              find:
+                paths: "{{ extracted_path }}"
+                patterns: jetbrains-toolbox
+                recurse: yes
+              register: find_toolbox
+            - name: Execute the Jetbrains Toolbox executable for the user
+              command: "{{ find_toolbox.files[0].path }} "
+            - debug:
+                msg: The toolbox should be open. If not, try opening it
+                      manually at {{ find_toolbox.files[0].path }}.
+                      Waiting until {{ tb_exe }} has been created ...
+            - wait_for:
+                path: "{{ tb_exe }}"
+                msg: Timeout while waiting for {{ tb_exe }}. Please install manually.
+    - name: Rust
+      vars:
+        rustup_path: /tmp/rustup.sh
+      block:
+        - name: Download the rustup installer
+          when: rustup_path is not exists
+          get_url:
+            url: https://sh.rustup.rs
+            dest: "{{ rustup_path }}"
+            mode: a+rx
+        - name: Execute the rustup installer
+          shell: "{{ rustup_path }} -y"
+    - name: Golang
+      vars:
+        version: 1.11.5
+        goroot: "{{home}}/.golang"
+        dl_url: "https://dl.google.com/go/go{{version}}.linux-amd64.tar.gz"
+        tmp_archive: /tmp/golang.tar.gz
+        tmp_dir: /tmp/golang
+      when: ( goroot is not exists ) or
+              ( lookup('file', goroot ~ "/VERSION") != "go" ~ version )
+      block:
+        - name: Download the latest Golang archive
+          when: tmp_archive is not exists
+          get_url:
+            url: "{{dl_url}}"
+            dest: "{{tmp_archive}}"
+            checksum: "sha256:{{ lookup('url', dl_url ~ '.sha256') }}"
+        - name: Create temporary directory for extraction of the Golang archive
+          tempfile:
+            state: directory
+            suffix: golang
+          register: tmp_dir
+        - name: Extract the latest Golang archive into the temporary directory
+          unarchive:
+            remote_src: yes
+            src: "{{tmp_archive}}"
+            dest: "{{ tmp_dir.path }}"
+        - name: Remove the existing $GOROOT
+          file:
+            path: "{{goroot}}"
+            state: absent
+        - name: Populate $GOROOT
+          command: "mv {{ tmp_dir.path }}/go {{goroot}}"
+    - name: Install self-contained binaries
+      when: item.exe is not exists
+      get_url:
+        url: "{{ item.url }}"
+        dest: "{{ item.exe }}"
+        mode: a+rx
+      with_items:
+        - exe: /usr/local/bin/youtube-dl
+          url: https://yt-dl.org/downloads/latest/youtube-dl
+        - exe: /usr/local/bin/diff-so-fancy
+          url: https://raw.githubusercontent.com/so-fancy/diff-so-fancy/master/third_party/build_fatpack/diff-so-fancy
+    - name: Vivaldi
+      block:
+        - name: Install the Vivaldi repository
+          yum_repository:
+            name: vivaldi
+            description: The Vivaldi Web Browser
+            enabled: yes
+            baseurl: https://repo.vivaldi.com/archive/rpm/$basearch
+            gpgcheck: yes
+            gpgkey: https://repo.vivaldi.com/archive/linux_signing_key.pub
+        - name: Install the Vivaldi package
+          package:
+            name: vivaldi-stable
+            state: present
