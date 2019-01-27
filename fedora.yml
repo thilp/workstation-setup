@@ -187,6 +187,33 @@
             - wait_for:
                 path: "{{ tb_exe }}"
                 msg: Timeout while waiting for {{ tb_exe }}. Please install manually.
+    - name: Haskell
+      tags:
+        - haskell
+        - languages
+      vars:
+        stack_installer_path: /tmp/stack.sh
+      block:
+        - name: Check whether stack is already installed
+          command: which stack
+          changed_when: false
+          failed_when: false
+          register: which_stack
+        - name: Upgrade the stack installer
+          when: which_stack.rc == 0
+          command: stack upgrade
+          register: stack_upgrade
+          changed_when: "'already running the most recent version' not in stack_upgrade.stderr"
+        - when: which_stack.rc != 0
+          block:
+            - name: Download the stack installer
+              when: stack_path is not exists
+              get_url:
+                url: https://get.haskellstack.org/
+                dest: "{{stack_installer_path}}"
+                mode: a+rx
+            - name: Execute the stack installer
+              command: "{{stack_installer_path}}"
     - name: Rust
       tags:
         - rust
