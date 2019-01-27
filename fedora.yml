@@ -290,3 +290,20 @@
           package:
             name: vivaldi-stable
             state: present
+    - name: char command
+      vars:
+        repo: "{{home}}/git/unicli"
+        fish_func_dir: "{{home}}/.config/fish/functions"
+        func_file: char.fish
+      when: repo is exists
+      block:
+        - name: Create ~/.unicode.data
+          command: fish make.fish
+          args:
+            chdir: "{{repo}}"
+            creates: "{{home}}/.unicode.data"
+        - name: Install the char function in Fish
+          command: "cp {{func_file}} {{fish_func_dir}}"
+          args:
+            chdir: "{{repo}}"
+            creates: "{{fish_func_dir}}/{{func_file}}"
