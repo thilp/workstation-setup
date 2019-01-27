@@ -36,11 +36,6 @@
           - xclip
           - yamllint
           - levien-inconsolata-fonts
-    - name: Restore Duplicity backup
-      block:
-        - package:
-            state: present
-            name: duplicity
     - name: Install Vim
       package:
         state: present
