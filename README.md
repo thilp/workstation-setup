@@ -16,9 +16,6 @@ ansible-pull -KU https://github.com/thilp/workstation-setup.git fedora.yml
 ```
 
 TODO:
-  - Install [Stack](https://docs.haskellstack.org/en/stable/README/#how-to-install).
-  - Restore a backup with Duplicity if it is obvious that nothing has been
-    restored yet.
   - Configure Gnome:
       - wallpaper
       - keymap
