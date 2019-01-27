@@ -10,10 +10,15 @@
         name: "*"
         state: latest
     - name: Setup hostname
+      vars:
+        desired_hostname: zal
+        hostname_path: /etc/hostname
+      when: ansible_env.HOSTNAME != desired_hostname
       block:
         - hostname:
-            name: zal
-        - shell: echo zal >/etc/hostname
+            name: "{{desired_hostname}}"
+        - shell: "echo {{desired_hostname}} >{{hostname_path}}"
+          when: lookup('file', hostname_path) != desired_hostname
     - name: Install basic tooling
       package:
         state: present
@@ -43,6 +48,8 @@
           - vim
           - ShellCheck
     - name: Python
+      tags:
+        - python
       block:
         - name: Install Python
           package:
@@ -71,6 +78,8 @@
             name: pipenv
             extra_args: --user
         - name: Poetry
+          tags:
+            - poetry
           vars:
             installer: /tmp/get-poetry.py
           block:
@@ -81,6 +90,8 @@
                 dest: "{{installer}}"
             - name: Run the Poetry installer
               command: "python3 {{installer}}"
+              register: poetry_install
+              changed_when: "'already installed' not in poetry_install.stdout"
         - name: Install IPython
           pip:
             name: ipython
@@ -109,10 +120,14 @@
             state: present
             name: code
     - name: Docker
+      tags:
+        - docker
       block:
         - name: Ask whether Docker is already installed
           command: which docker
           register: which_docker
+          changed_when: false
+          failed_when: false
         - when: which_docker.rc != 0
           block:
             - name: Download & install Docker
@@ -128,6 +143,8 @@
                 state: started
                 enabled: yes
     - name: Jetbrains IDEs
+      tags:
+        - jetbrains
       block:
         - name: Increase inotify watch limit
           sysctl:
@@ -171,6 +188,9 @@
                 path: "{{ tb_exe }}"
                 msg: Timeout while waiting for {{ tb_exe }}. Please install manually.
     - name: Rust
+      tags:
+        - rust
+        - languages
       vars:
         rustup_path: /tmp/rustup.sh
       block:
@@ -183,6 +203,10 @@
         - name: Execute the rustup installer
           shell: "{{ rustup_path }} -y"
     - name: Golang
+      tags:
+        - go
+        - golang
+        - languages
       vars:
         version: 1.11.5
         goroot: "{{home}}/.golang"
