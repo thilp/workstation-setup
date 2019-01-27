@@ -1,11 +1,12 @@
 # This is an Ansible playbook.
 # Run it with: ansible-playbook -K <THIS-FILE>
 - hosts: localhost
-  become: true
   vars:
-    home: "{{ lookup('env', 'HOME') }}"
+    home: "{{ ansible_env.HOME }}"
   tasks:
     - name: Upgrade all packages
+      become: true
+      tags: [sudo]
       dnf:
         name: "*"
         state: latest
@@ -17,9 +18,15 @@
       block:
         - hostname:
             name: "{{desired_hostname}}"
+          become: true
+          tags: [sudo]
         - shell: "echo {{desired_hostname}} >{{hostname_path}}"
           when: lookup('file', hostname_path) != desired_hostname
+          become: true
+          tags: [sudo]
     - name: Install basic tooling
+      become: true
+      tags: [sudo]
       package:
         state: present
         name:
@@ -42,6 +49,8 @@
           - yamllint
           - levien-inconsolata-fonts
     - name: Install Vim
+      become: true
+      tags: [sudo]
       package:
         state: present
         name:
@@ -52,6 +61,8 @@
         - python
       block:
         - name: Install Python
+          become: true
+          tags: [sudo]
           package:
             state: present
             name:
@@ -76,7 +87,7 @@
         - name: Install Pipenv
           pip:
             name: pipenv
-            extra_args: --user
+            extra_args: --user --upgrade
         - name: Poetry
           tags:
             - poetry
@@ -98,6 +109,8 @@
             virtualenv: "{{home}}/.virtualenvs/ipython"
             virtualenv_site_packages: yes
     - name: Install Java
+      become: true
+      tags: [sudo]
       package:
         state: present
         name:
@@ -108,6 +121,8 @@
     - name: VSCode
       block:
         - name: Install the VSCode repository
+          become: true
+          tags: [sudo]
           yum_repository:
             name: vscode
             description: Visual Studio Code
@@ -116,6 +131,8 @@
             gpgcheck: yes
             gpgkey: https://packages.microsoft.com/keys/microsoft.asc
         - name: Install VSCode
+          become: true
+          tags: [sudo]
           package:
             state: present
             name: code
@@ -131,13 +148,19 @@
         - when: which_docker.rc != 0
           block:
             - name: Download & install Docker
+              become: true
+              tags: [sudo]
               shell: curl -fsSL get.docker.com | CHANNEL=test sh
             - name: Add me in the docker group
+              become: true
+              tags: [sudo]
               user:
                 name: "{{ lookup('env', 'USER') }}"
                 groups: [docker]
                 append: yes
             - name: Enable & start Docker with systemd
+              become: true
+              tags: [sudo]
               systemd:
                 name: docker
                 state: started
@@ -147,6 +170,8 @@
         - jetbrains
       block:
         - name: Increase inotify watch limit
+          become: true
+          tags: [sudo]
           sysctl:
             name: fs.inotify.max_user_watches
             value: 524288
@@ -277,6 +302,8 @@
         - exe: /usr/local/bin/diff-so-fancy
           url: https://raw.githubusercontent.com/so-fancy/diff-so-fancy/master/third_party/build_fatpack/diff-so-fancy
     - name: Vivaldi
+      become: true
+      tags: [sudo]
       block:
         - name: Install the Vivaldi repository
           yum_repository:
@@ -307,3 +334,12 @@
           args:
             chdir: "{{repo}}"
             creates: "{{fish_func_dir}}/{{func_file}}"
+    - name: STUPS tooling
+      tags:
+        - stups
+        - zalando
+      pip:
+        name:
+          - stups
+          - stups-zign
+        extra_args: --user --upgrade
