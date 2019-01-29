@@ -55,6 +55,7 @@
             src: "{{restored_dir}}/etc/{{item}}"
             dest: "/etc/{{item}}"
           with_items:
+            - anacrontab
             - cron.3days/full-backup
             - cron.weekly/compact-backups
         - cron:
