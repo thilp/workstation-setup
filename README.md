@@ -10,6 +10,12 @@ The many usual weaknesses of shell scripting (I don't want to maintain 300+
 lines of shell to ensure proper error reporting, idempotence, and absence of
 quoting bugs) later drove me to Ansible for this task.
 
+- `duplicity.yaml` restores everything I need from my
+  [Duplicity](http://duplicity.nongnu.org) backups (mostly config files, git
+  repos and documents — no software of course).
+- `fedora.yaml` installs all the software I need, or updates it if it is
+  already installed.
+
 With [ansible-pull](https://docs.ansible.com/ansible/latest/cli/ansible-pull.html):
 ```
 ansible-pull -KU https://github.com/thilp/workstation-setup.git fedora.yml
