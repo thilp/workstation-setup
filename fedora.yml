@@ -291,7 +291,7 @@
         - golang
         - languages
       vars:
-        version: 1.11.5
+        version: 1.12
         goroot: "{{home}}/.golang"
         dl_url: "https://dl.google.com/go/go{{version}}.linux-amd64.tar.gz"
         tmp_archive: /tmp/golang.tar.gz
@@ -321,6 +321,36 @@
             state: absent
         - name: Populate $GOROOT
           command: "mv {{ tmp_dir.path }}/go {{goroot}}"
+    - name: dep
+      tags:
+        - go
+        - golang
+      vars:
+        installer_path: /tmp/dep-install.sh
+      block:
+        - name: Download the dep installer
+          when: installer_path is not exists
+          get_url:
+            url: https://raw.githubusercontent.com/golang/dep/master/install.sh
+            dest: "{{ installer_path }}"
+            mode: a+rx
+        - name: Execute the dep installer
+          shell: "{{ installer_path }}"
+    - name: staticcheck
+      tags:
+        - go
+        - golang
+        - linter
+      vars:
+        version: "2019.1"
+        final_path: "{{ home }}/go/bin/staticcheck"
+        url: "https://github.com/dominikh/go-tools/releases/download/{{ version }}/staticcheck_linux_amd64"
+      get_url:
+        url: "{{ url}}"
+        dest: "{{ final_path }}"
+        mode: a+rx
+        checksum: "sha256:{{ url }}.sha256"
+
     - name: Install self-contained binaries
       when: item.exe is not exists
       get_url:
