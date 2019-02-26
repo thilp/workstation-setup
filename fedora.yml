@@ -283,7 +283,8 @@
             dest: "{{ rustup_path }}"
             mode: a+rx
         - name: Execute the rustup installer
-          shell: "{{ rustup_path }} -y"
+          # Available toolchains: stable, beta, nightly, none
+          shell: "{{ rustup_path }} --default-toolchain nightly -y"
     - name: Golang
       tags:
         - go
