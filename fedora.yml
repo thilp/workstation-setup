@@ -218,29 +218,57 @@
       tags:
         - haskell
         - languages
-      vars:
-        stack_installer_path: /tmp/stack.sh
       block:
-        - name: Check whether stack is already installed
-          command: which stack
-          changed_when: false
-          failed_when: false
-          register: which_stack
-        - name: Upgrade the stack installer
-          when: which_stack.rc == 0
-          command: stack upgrade
-          register: stack_upgrade
-          changed_when: "'already running the most recent version' not in stack_upgrade.stderr"
-        - when: which_stack.rc != 0
+        - name: Stack
+          vars:
+            stack_installer_path: /tmp/stack.sh
           block:
-            - name: Download the stack installer
-              when: stack_path is not exists
-              get_url:
-                url: https://get.haskellstack.org/
-                dest: "{{stack_installer_path}}"
-                mode: a+rx
-            - name: Execute the stack installer
-              command: "{{stack_installer_path}}"
+            - name: Check whether stack is already installed
+              command: which stack
+              changed_when: false
+              failed_when: false
+              register: which_stack
+            - name: Upgrade the stack installer
+              when: which_stack.rc == 0
+              command: stack upgrade
+              register: stack_upgrade
+              changed_when: "'already running the most recent version' not in stack_upgrade.stderr"
+            - when: which_stack.rc != 0
+              block:
+                - name: Download the stack installer
+                  when: stack_path is not exists
+                  get_url:
+                    url: https://get.haskellstack.org/
+                    dest: "{{stack_installer_path}}"
+                    mode: a+rx
+                - name: Execute the stack installer
+                  command: "{{stack_installer_path}}"
+        - name: Haskell Language Server
+          vars:
+            path: "{{home}}/git/misc/haskell-ide-engine"
+          block:
+            - name: Clone HIE if not already cloned
+              when: path is not exists
+              git:
+                repo: https://github.com/haskell/haskell-ide-engine
+                dest: "{{path}}"
+                recursive: yes
+            - name: Install libraries required by HIE
+              tags: [sudo]
+              become: true
+              package:
+                state: present
+                name:
+                  - libicu-devel
+                  - ncurses-devel
+            - name: Build HIE
+              command: make hie-8.6.3
+              args:
+                chdir: "{{path}}"
+            - name: Build Haskell docs for displaying with HIE
+              command: make build-doc-8.6.3
+              args:
+                chdir: "{{path}}"
     - name: Rust
       tags:
         - rust
