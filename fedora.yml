@@ -404,3 +404,15 @@
           - stups
           - stups-zign
         extra_args: --user --upgrade
+    - name: Clojure
+      tags:
+        - clojure
+        - languages
+      vars:
+        path: "{{ home }}/bin/lein"
+      block:
+        - name: Leiningen
+          get_url:
+            url: https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
+            dest: "{{ path }}"
+            mode: a+x
