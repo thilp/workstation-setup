@@ -31,15 +31,22 @@
         state: present
         name:
           - asciinema
+          - bat
           - chrome-gnome-shell
           - colordiff
+          - direnv
           - dnf-plugins-core
+          - exa
+          - fd-find
           - fish
           - fzf
+          - gimp-heif-plugin
           - gnome-tweaks
+          - google-roboto-fonts
           - gparted
           - htop
           - jq
+          - linux-libertine-fonts
           - most
           - ripgrep
           - ruby-devel
@@ -291,7 +298,7 @@
         - golang
         - languages
       vars:
-        version: 1.12
+        version: 1.12.7
         goroot: "{{home}}/.golang"
         dl_url: "https://dl.google.com/go/go{{version}}.linux-amd64.tar.gz"
         tmp_archive: /tmp/golang.tar.gz
@@ -416,3 +423,8 @@
             url: https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
             dest: "{{ path }}"
             mode: a+x
+    - name: Misc tooling
+      pip:
+        name:
+          - yq
+        extra_args: --user --upgrade
