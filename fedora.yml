@@ -1,3 +1,4 @@
+---
 # This is an Ansible playbook.
 # Run it with: ansible-playbook -K <THIS-FILE>
 - hosts: localhost
@@ -39,15 +40,21 @@
           - exa
           - fd-find
           - fish
+          - flameshot
           - fzf
           - gimp-heif-plugin
           - gnome-tweaks
           - google-roboto-fonts
           - gparted
+          - graphviz
           - htop
+          - hub
           - jq
+          - levien-inconsolata-fonts
           - linux-libertine-fonts
           - most
+          - neovim
+          - python3-neovim
           - ripgrep
           - ruby-devel
           - tmux
@@ -55,7 +62,6 @@
           - units
           - xclip
           - yamllint
-          - levien-inconsolata-fonts
     - name: Install Vim
       become: true
       tags: [sudo]
