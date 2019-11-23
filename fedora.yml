@@ -51,6 +51,7 @@
           - jq
           - levien-inconsolata-fonts
           - linux-libertine-fonts
+          - make
           - most
           - neovim
           - python3-neovim
@@ -102,6 +103,7 @@
               - libffi-devel
               - libtool
               - lldb
+              - openssl-devel
               - python-lldb
               - python-devel
               - python3-devel
