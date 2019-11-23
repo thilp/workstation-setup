@@ -116,25 +116,6 @@
           git:
             repo: https://github.com/pyenv/pyenv.git
             dest: "{{home}}/.pyenv"
-        - name: Install Pipenv
-          pip:
-            name: pipenv
-            extra_args: --user --upgrade
-        - name: Poetry
-          tags:
-            - poetry
-          vars:
-            installer: /tmp/get-poetry.py
-          block:
-            - name: Download the Poetry installer
-              when: installer is not exists
-              get_url:
-                url: https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py
-                dest: "{{installer}}"
-            - name: Run the Poetry installer
-              command: "python3 {{installer}}"
-              register: poetry_install
-              changed_when: "'already installed' not in poetry_install.stdout"
     - name: Install Java
       become: true
       tags: [sudo]
