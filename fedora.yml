@@ -1,6 +1,7 @@
 ---
 # This is an Ansible playbook.
 # Run it with: ansible-playbook -K <THIS-FILE>
+# Last updated for Fedora 31.
 - hosts: localhost
   vars:
     home: "{{ ansible_env.HOME }}"
@@ -35,14 +36,12 @@
           - bat
           - chrome-gnome-shell
           - colordiff
-          - direnv
           - dnf-plugins-core
           - exa
           - fd-find
           - fish
           - flameshot
           - fzf
-          - gimp-heif-plugin
           - gnome-tweaks
           - google-roboto-fonts
           - gparted
@@ -62,14 +61,30 @@
           - units
           - xclip
           - yamllint
-    - name: Install Vim
+    - name: Neovim Plugins
+      tags: [vim]
+      vars:
+        site: "{{ home }}/.local/share/nvim/site"
+      block:
+        - file:
+            path: "{{ site }}"
+            state: directory
+        - git:
+            repo: git@github.com:thilp/nvim-plugins.git 
+            dest: "{{ site }}/pack"
+            track_submodules: true
+    - name: Alacritty
       become: true
-      tags: [sudo]
-      package:
-        state: present
-        name:
-          - vim
-          - ShellCheck
+      tags: [sudo, alacritty]
+      block:
+        - command:
+            cmd: "dnf copr enable pschyska/alacritty"
+            stdin: "y"
+            warn: false
+            creates: /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:pschyska:alacritty.repo
+        - package:
+            state: present
+            name: alacritty
     - name: Python
       tags:
         - python
@@ -118,21 +133,16 @@
               command: "python3 {{installer}}"
               register: poetry_install
               changed_when: "'already installed' not in poetry_install.stdout"
-        - name: Install IPython
-          pip:
-            name: ipython
-            virtualenv: "{{home}}/.virtualenvs/ipython"
-            virtualenv_site_packages: yes
     - name: Install Java
       become: true
       tags: [sudo]
       package:
         state: present
         name:
-          - java-openjdk
-          - java-openjdk-devel
-          - java-openjdk-src
-          - java-openjdk-javadoc
+          - java-latest-openjdk-headless
+          - java-latest-openjdk-devel
+          - java-latest-openjdk-src
+          - java-latest-openjdk-javadoc
     - name: VSCode
       block:
         - name: Install the VSCode repository
@@ -142,8 +152,8 @@
             name: vscode
             description: Visual Studio Code
             baseurl: https://packages.microsoft.com/yumrepos/vscode
-            enabled: yes
-            gpgcheck: yes
+            enabled: true
+            gpgcheck: true
             gpgkey: https://packages.microsoft.com/keys/microsoft.asc
         - name: Install VSCode
           become: true
@@ -172,14 +182,14 @@
               user:
                 name: "{{ lookup('env', 'USER') }}"
                 groups: [docker]
-                append: yes
+                append: true
             - name: Enable & start Docker with systemd
               become: true
               tags: [sudo]
               systemd:
                 name: docker
                 state: started
-                enabled: yes
+                enabled: true
     - name: Jetbrains IDEs
       tags:
         - jetbrains
@@ -189,34 +199,38 @@
           tags: [sudo]
           sysctl:
             name: fs.inotify.max_user_watches
-            value: 524288
+            value: "524288"
             sysctl_file: /etc/sysctl.d/jetbrains.conf
-            reload: yes
+            reload: true
         - vars:
             tb_exe: "{{home}}/.local/share/JetBrains/Toolbox/bin/jetbrains-toolbox"
             archive_path: /tmp/jetbrains_toolbox.tar.gz
-            extracted_path: /tmp/jetbrains_toolbox
           when: tb_exe is not exists
           block:
             - name: Download Jetbrains Toolbox
               vars:
                 tb_json: "{{ lookup('url', 'https://data.services.jetbrains.com/products/releases?code=TBA&latest=true&type=release') | from_json }}"
                 tb_url: "{{ tb_json | json_query('TBA[0].downloads.linux.link') }}"
-                tb_checksum_url: "{{ tb_json | json_query('TBA[0].downloads.linux.checksumLink') }}"
+                # tb_checksum_url: "{{ tb_json | json_query('TBA[0].downloads.linux.checksumLink') }}"
               get_url:
                 url: "{{ tb_url }}"
-                checksum: "sha256:{{ tb_checksum_url }}"
+                # checksum: "sha256:{{ tb_checksum_url }}"
                 dest: "{{ archive_path }}"
+            - name: Create temporary directory
+              tempfile:
+                state: directory
+                suffix: jetbrains
+              register: extracted_path
             - name: Install Jetbrains Toolbox
               unarchive:
-                remote_src: yes
+                remote_src: true
                 src: "{{ archive_path }}"
                 dest: "{{ extracted_path }}"
             - name: Locate the Jetbrains Toolbox executable
               find:
                 paths: "{{ extracted_path }}"
                 patterns: jetbrains-toolbox
-                recurse: yes
+                recurse: true
               register: find_toolbox
             - name: Execute the Jetbrains Toolbox executable for the user
               command: "{{ find_toolbox.files[0].path }} "
@@ -227,84 +241,13 @@
             - wait_for:
                 path: "{{ tb_exe }}"
                 msg: Timeout while waiting for {{ tb_exe }}. Please install manually.
-    - name: Haskell
-      tags:
-        - haskell
-        - languages
-      block:
-        - name: Stack
-          vars:
-            stack_installer_path: /tmp/stack.sh
-          block:
-            - name: Check whether stack is already installed
-              command: which stack
-              changed_when: false
-              failed_when: false
-              register: which_stack
-            - name: Upgrade the stack installer
-              when: which_stack.rc == 0
-              command: stack upgrade
-              register: stack_upgrade
-              changed_when: "'already running the most recent version' not in stack_upgrade.stderr"
-            - when: which_stack.rc != 0
-              block:
-                - name: Download the stack installer
-                  when: stack_path is not exists
-                  get_url:
-                    url: https://get.haskellstack.org/
-                    dest: "{{stack_installer_path}}"
-                    mode: a+rx
-                - name: Execute the stack installer
-                  command: "{{stack_installer_path}}"
-        - name: Haskell Language Server
-          vars:
-            path: "{{home}}/git/misc/haskell-ide-engine"
-          block:
-            - name: Clone HIE if not already cloned
-              when: path is not exists
-              git:
-                repo: https://github.com/haskell/haskell-ide-engine
-                dest: "{{path}}"
-                recursive: yes
-            - name: Install libraries required by HIE
-              tags: [sudo]
-              become: true
-              package:
-                state: present
-                name:
-                  - libicu-devel
-                  - ncurses-devel
-            - name: Build HIE
-              command: make hie-8.6.3
-              args:
-                chdir: "{{path}}"
-            - name: Build Haskell docs for displaying with HIE
-              command: make build-doc-8.6.3
-              args:
-                chdir: "{{path}}"
-    - name: Rust
-      tags:
-        - rust
-        - languages
-      vars:
-        rustup_path: /tmp/rustup.sh
-      block:
-        - name: Download the rustup installer
-          when: rustup_path is not exists
-          get_url:
-            url: https://sh.rustup.rs
-            dest: "{{ rustup_path }}"
-            mode: a+rx
-        - name: Execute the rustup installer
-          # Available toolchains: stable, beta, nightly, none
-          shell: "{{ rustup_path }} --default-toolchain nightly -y"
     - name: Golang
       tags:
         - go
         - golang
         - languages
       vars:
-        version: 1.12.7
+        version: 1.13.4
         goroot: "{{home}}/.golang"
         dl_url: "https://dl.google.com/go/go{{version}}.linux-amd64.tar.gz"
         tmp_archive: /tmp/golang.tar.gz
@@ -325,7 +268,7 @@
           register: tmp_dir
         - name: Extract the latest Golang archive into the temporary directory
           unarchive:
-            remote_src: yes
+            remote_src: true
             src: "{{tmp_archive}}"
             dest: "{{ tmp_dir.path }}"
         - name: Remove the existing $GOROOT
@@ -334,47 +277,15 @@
             state: absent
         - name: Populate $GOROOT
           command: "mv {{ tmp_dir.path }}/go {{goroot}}"
-    - name: dep
-      tags:
-        - go
-        - golang
-      vars:
-        installer_path: /tmp/dep-install.sh
-      block:
-        - name: Download the dep installer
-          when: installer_path is not exists
-          get_url:
-            url: https://raw.githubusercontent.com/golang/dep/master/install.sh
-            dest: "{{ installer_path }}"
-            mode: a+rx
-        - name: Execute the dep installer
-          shell: "{{ installer_path }}"
     - name: staticcheck
       tags:
         - go
         - golang
         - linter
-      vars:
-        version: "2019.1"
-        final_path: "{{ home }}/go/bin/staticcheck"
-        url: "https://github.com/dominikh/go-tools/releases/download/{{ version }}/staticcheck_linux_amd64"
-      get_url:
-        url: "{{ url}}"
-        dest: "{{ final_path }}"
-        mode: a+rx
-        checksum: "sha256:{{ url }}.sha256"
+      command:
+        cmd: go get honnef.co/go/tools/cmd/staticcheck
+        creates: "{{ home }}/go/bin/staticcheck"
 
-    - name: Install self-contained binaries
-      when: item.exe is not exists
-      get_url:
-        url: "{{ item.url }}"
-        dest: "{{ item.exe }}"
-        mode: a+rx
-      with_items:
-        - exe: /usr/local/bin/youtube-dl
-          url: https://yt-dl.org/downloads/latest/youtube-dl
-        - exe: /usr/local/bin/diff-so-fancy
-          url: https://raw.githubusercontent.com/so-fancy/diff-so-fancy/master/third_party/build_fatpack/diff-so-fancy
     - name: Vivaldi
       become: true
       tags: [sudo]
@@ -383,14 +294,15 @@
           yum_repository:
             name: vivaldi
             description: The Vivaldi Web Browser
-            enabled: yes
+            enabled: true
             baseurl: https://repo.vivaldi.com/archive/rpm/$basearch
-            gpgcheck: yes
+            gpgcheck: true
             gpgkey: https://repo.vivaldi.com/archive/linux_signing_key.pub
         - name: Install the Vivaldi package
           package:
             name: vivaldi-stable
             state: present
+
     - name: char command
       vars:
         repo: "{{home}}/git/unicli"
@@ -408,15 +320,7 @@
           args:
             chdir: "{{repo}}"
             creates: "{{fish_func_dir}}/{{func_file}}"
-    - name: STUPS tooling
-      tags:
-        - stups
-        - zalando
-      pip:
-        name:
-          - stups
-          - stups-zign
-        extra_args: --user --upgrade
+
     - name: Clojure
       tags:
         - clojure
@@ -424,13 +328,18 @@
       vars:
         path: "{{ home }}/bin/lein"
       block:
+        - file:
+            path: "{{ home }}/bin"
+            state: directory
         - name: Leiningen
           get_url:
             url: https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
             dest: "{{ path }}"
             mode: a+x
-    - name: Misc tooling
-      pip:
-        name:
-          - yq
-        extra_args: --user --upgrade
+
+    - name: git diff
+      tags: [git]
+      get_url:
+        url: https://raw.githubusercontent.com/so-fancy/diff-so-fancy/master/third_party/build_fatpack/diff-so-fancy
+        dest: "{{ home }}/bin/diff-so-fancy"
+        mode: a+rx
