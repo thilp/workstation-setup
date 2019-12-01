@@ -50,6 +50,7 @@
           - hub
           - jq
           - levien-inconsolata-fonts
+          - libheif  # for $ heif-convert IMG.heic IMG.jpg
           - linux-libertine-fonts
           - make
           - most
