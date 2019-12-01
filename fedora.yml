@@ -310,11 +310,29 @@
         - clojure
         - languages
       vars:
-        bin: "{{ home }}/.local/bin"
+        local: "{{ home }}/.local"
+        bin: "{{ local }}/bin"
       block:
         - file:
             path: "{{ bin }}"
             state: directory
+        - name: clj
+          block:
+            - name: Install clj dependencies
+              become: true
+              package:
+                state: present
+                name:
+                  - rlwrap
+            - name: Download clj installer
+              get_url:
+                url: https://download.clojure.org/install/linux-install-1.10.1.492.sh
+                dest: /tmp
+                mode: a+x
+              register: installer
+            - name: Run clj installer
+              command:
+                cmd: "{{ installer.dest }} --prefix {{ local }}"
         - name: Leiningen
           get_url:
             url: https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
